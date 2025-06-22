@@ -14,8 +14,9 @@ export default function ChallengeItem({
   challenge, 
   isCompleted, 
   onToggle,
-  accentColor 
-}: ChallengeItemProps) {
+  accentColor,
+  disabled = false
+}: ChallengeItemProps & { disabled?: boolean }) {
   return (
     <TouchableOpacity 
       style={[
@@ -24,10 +25,13 @@ export default function ChallengeItem({
           backgroundColor: accentColor + '10',
           borderColor: accentColor + '30',
           borderWidth: 1,
-        }
+        },
+        disabled && { opacity: 0.5 }
       ]} 
-      onPress={onToggle}
-      activeOpacity={0.7}>
+      onPress={disabled ? undefined : onToggle}
+      activeOpacity={0.7}
+      disabled={disabled}
+    >
       
       <View style={styles.leftContent}>
         <View style={[styles.dayBadge, { backgroundColor: accentColor + '15' }]}>

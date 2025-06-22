@@ -149,16 +149,25 @@ export default function CategoryScreen() {
         contentContainerStyle={styles.scrollContent}>
         <Text style={styles.challengesTitle}>Retos Diarios</Text>
         
-        {category.challenges.map((challenge) => {
+        {category.challenges.map((challenge, idx) => {
           const isCompleted = progress[category.id]?.[challenge.id] || false;
-          
+          let isUnlocked = false;
+          if (idx === 0) {
+            isUnlocked = true;
+          } else {
+            const prevChallenge = category.challenges[idx - 1];
+            isUnlocked = progress[category.id]?.[prevChallenge.id] || false;
+          }
+          // Si está bloqueado, pasar una función vacía para evitar error de tipo
+          const handleToggle = isUnlocked ? () => handleChallengeToggle(challenge.id) : () => {};
           return (
             <ChallengeItem
               key={challenge.id}
               challenge={challenge}
               isCompleted={isCompleted}
-              onToggle={() => handleChallengeToggle(challenge.id)}
+              onToggle={handleToggle}
               accentColor={category.color}
+              disabled={!isUnlocked && !isCompleted}
             />
           );
         })}
