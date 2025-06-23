@@ -7,12 +7,13 @@ import {
   ScrollView, 
   SafeAreaView,
   RefreshControl,
-  Image
+  Image,
+  Platform
 } from 'react-native';
 import { router } from 'expo-router';
 import { categories } from '@/data/challenges';
 import { Progress } from '@/types/challenges';
-import { loadProgress, calculateCategoryProgress } from '@/utils/storage';
+import { loadProgress } from '@/utils/storage';
 import CategoryCard from '@/components/CategoryCard';
 
 export default function HomeScreen() {
@@ -110,12 +111,12 @@ export default function HomeScreen() {
           
           <View style={styles.categoriesGrid}>
             {categories.map((category) => {
-              const categoryProgress = calculateCategoryProgress(
-                progress, 
-                category.id, 
-                category.challenges.length
-              );
-              
+              // Calcular progreso real por tareas
+              const totalTasks = category.challenges.reduce((sum, day) => sum + day.tasks.length, 0);
+              const completedTasks = category.challenges.reduce((sum, day) => {
+                return sum + day.tasks.filter((task) => progress[category.id]?.[day.day]?.[task.id]).length;
+              }, 0);
+              const categoryProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
               return (
                 <CategoryCard
                   key={category.id}
@@ -190,13 +191,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 20,
     elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+    }),
   },
   progressHeader: {
     flexDirection: 'row',
@@ -255,6 +263,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderLeftWidth: 4,
     borderLeftColor: '#ff6b6b',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 2px 4px rgba(255,107,107,0.08)',
+      },
+      default: {
+        shadowColor: '#ff6b6b',
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+    }),
   },
   motivationTitle: {
     fontSize: 18,

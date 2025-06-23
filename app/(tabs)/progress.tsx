@@ -12,7 +12,7 @@ import {
 import { Trophy, Target, TrendingUp } from 'lucide-react-native';
 import { categories } from '@/data/challenges';
 import { Progress } from '@/types/challenges';
-import { loadProgress, calculateCategoryProgress } from '@/utils/storage';
+import { loadProgress } from '@/utils/storage';
 import ProgressBar from '@/components/ProgressBar';
 
 export default function ProgressScreen() {
@@ -41,30 +41,28 @@ export default function ProgressScreen() {
   };
 
   const getTotalProgress = () => {
-    const totalChallenges = categories.reduce((sum, cat) => sum + cat.challenges.length, 0);
-    const completedChallenges = categories.reduce((sum, cat) => {
-      const categoryProgress = progress[cat.id] || {};
-      return sum + Object.values(categoryProgress).filter(Boolean).length;
+    const totalTasks = categories.reduce((sum, cat) => sum + cat.challenges.reduce((s, d) => s + d.tasks.length, 0), 0);
+    const completedTasks = categories.reduce((sum, cat) => {
+      return sum + cat.challenges.reduce((s, day) => s + day.tasks.filter(task => progress[cat.id]?.[day.day]?.[task.id]).length, 0);
     }, 0);
-    
-    return Math.round((completedChallenges / totalChallenges) * 100);
+    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   };
 
   const getCompletedChallenges = () => {
     return categories.reduce((sum, cat) => {
-      const categoryProgress = progress[cat.id] || {};
-      return sum + Object.values(categoryProgress).filter(Boolean).length;
+      return sum + cat.challenges.reduce((s, day) => s + day.tasks.filter(task => progress[cat.id]?.[day.day]?.[task.id]).length, 0);
     }, 0);
   };
 
   const getTotalChallenges = () => {
-    return categories.reduce((sum, cat) => sum + cat.challenges.length, 0);
+    return categories.reduce((sum, cat) => sum + cat.challenges.reduce((s, d) => s + d.tasks.length, 0), 0);
   };
 
   const getCompletedCategories = () => {
     return categories.filter(cat => {
-      const categoryProgress = calculateCategoryProgress(progress, cat.id, cat.challenges.length);
-      return categoryProgress === 100;
+      const totalTasks = cat.challenges.reduce((s, d) => s + d.tasks.length, 0);
+      const completedTasks = cat.challenges.reduce((s, day) => s + day.tasks.filter(task => progress[cat.id]?.[day.day]?.[task.id]).length, 0);
+      return totalTasks > 0 && Math.round((completedTasks / totalTasks) * 100) === 100;
     }).length;
   };
 
@@ -150,12 +148,11 @@ export default function ProgressScreen() {
           <Text style={styles.sectionTitle}>Por Categoría</Text>
           
           {categories.map((category) => {
-            const categoryProgress = calculateCategoryProgress(
-              progress, 
-              category.id, 
-              category.challenges.length
-            );
-            const completedCount = Object.values(progress[category.id] || {}).filter(Boolean).length;
+            const categoryProgress = progress[category.id] || {};
+            const completedCount = Object.values(categoryProgress).filter(Boolean).length;
+            const totalChallengesInCategory = category.challenges.length;
+            const completedChallengesInCategory = Object.values(categoryProgress).filter(Boolean).length;
+            const categoryCompletionPercentage = Math.round((completedChallengesInCategory / totalChallengesInCategory) * 100);
             
             return (
               <View key={category.id} style={styles.categoryCard}>
@@ -163,15 +160,15 @@ export default function ProgressScreen() {
                   <View style={styles.categoryInfo}>
                     <Text style={styles.categoryName}>{category.name}</Text>
                     <Text style={styles.categoryCount}>
-                      {completedCount} de {category.challenges.length} retos
+                      {completedCount} de {totalChallengesInCategory} retos
                     </Text>
                   </View>
                   
                   <View style={styles.categoryProgress}>
                     <Text style={[styles.categoryPercentage, { color: category.color }]}>
-                      {categoryProgress}%
+                      {categoryCompletionPercentage}%
                     </Text>
-                    {categoryProgress === 100 && (
+                    {categoryCompletionPercentage === 100 && (
                       <Trophy color="#ffd700" size={20} strokeWidth={2} />
                     )}
                   </View>
@@ -179,7 +176,7 @@ export default function ProgressScreen() {
                 
                 <View style={styles.progressBarContainer}>
                   <ProgressBar 
-                    progress={categoryProgress} 
+                    progress={categoryCompletionPercentage} 
                     color={category.color} 
                     height={8} 
                   />

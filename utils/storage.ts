@@ -2,11 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Progress } from '@/types/challenges';
 
 const PROGRESS_KEY = 'challenge_progress';
+const isWeb = typeof window !== 'undefined';
 
 export const loadProgress = async (): Promise<Progress> => {
   try {
-    const progressData = await AsyncStorage.getItem(PROGRESS_KEY);
-    return progressData ? JSON.parse(progressData) : {};
+    if (isWeb) {
+      const progressData = localStorage.getItem(PROGRESS_KEY);
+      return progressData ? JSON.parse(progressData) : {};
+    } else {
+      const progressData = await AsyncStorage.getItem(PROGRESS_KEY);
+      return progressData ? JSON.parse(progressData) : {};
+    }
   } catch (error) {
     console.error('Error loading progress:', error);
     return {};
@@ -15,7 +21,11 @@ export const loadProgress = async (): Promise<Progress> => {
 
 export const saveProgress = async (progress: Progress): Promise<void> => {
   try {
-    await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    if (isWeb) {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    } else {
+      await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
   } catch (error) {
     console.error('Error saving progress:', error);
   }
@@ -23,17 +33,18 @@ export const saveProgress = async (progress: Progress): Promise<void> => {
 
 export const toggleChallengeCompletion = async (
   categoryId: string,
-  challengeId: number
+  day: number,
+  taskId: number
 ): Promise<Progress> => {
   const progress = await loadProgress();
-  
   if (!progress[categoryId]) {
     progress[categoryId] = {};
   }
-  
-  progress[categoryId][challengeId] = !progress[categoryId][challengeId];
+  if (!progress[categoryId][day]) {
+    progress[categoryId][day] = {};
+  }
+  progress[categoryId][day][taskId] = !progress[categoryId][day][taskId];
   await saveProgress(progress);
-  
   return progress;
 };
 
@@ -41,12 +52,5 @@ export const resetCategoryProgress = async (categoryId: string): Promise<Progres
   const progress = await loadProgress();
   progress[categoryId] = {};
   await saveProgress(progress);
-  
   return progress;
-};
-
-export const calculateCategoryProgress = (progress: Progress, categoryId: string, totalChallenges: number): number => {
-  const categoryProgress = progress[categoryId] || {};
-  const completedCount = Object.values(categoryProgress).filter(Boolean).length;
-  return Math.round((completedCount / totalChallenges) * 100);
 };

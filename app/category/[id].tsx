@@ -16,8 +16,7 @@ import { Progress } from '@/types/challenges';
 import { 
   loadProgress, 
   toggleChallengeCompletion, 
-  resetCategoryProgress,
-  calculateCategoryProgress 
+  resetCategoryProgress
 } from '@/utils/storage';
 import ChallengeItem from '@/components/ChallengeItem';
 
@@ -44,8 +43,8 @@ export default function CategoryScreen() {
     loadData();
   }, []);
 
-  const handleChallengeToggle = async (challengeId: number) => {
-    const newProgress = await toggleChallengeCompletion(category.id, challengeId);
+  const handleChallengeToggle = async (dayId: number, taskId: number) => {
+    const newProgress = await toggleChallengeCompletion(category.id, dayId, taskId);
     setProgress(newProgress);
   };
 
@@ -70,13 +69,17 @@ export default function CategoryScreen() {
     );
   };
 
-  const categoryProgress = calculateCategoryProgress(
-    progress, 
-    category.id, 
-    category.challenges.length
-  );
+  // Calcular progreso total considerando días completos
+  const totalTasks = category.challenges.reduce((sum, day) => sum + day.tasks.length, 0);
+  const completedTasks = category.challenges.reduce((sum, day, dayIdx) => {
+    return sum + day.tasks.filter((task, taskIdx) => progress[category.id]?.[day.day]?.[task.id]).length;
+  }, 0);
+  const categoryProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const completedCount = Object.values(progress[category.id] || {}).filter(Boolean).length;
+  // Calcular días completos
+  const completedDays = category.challenges.filter(day =>
+    day.tasks.every(task => progress[category.id]?.[day.day]?.[task.id])
+  ).length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -113,21 +116,22 @@ export default function CategoryScreen() {
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <View style={styles.progressStats}>
-            <Text style={[styles.progressPercentage, { color: category.color }]}>
+            <Text style={[styles.progressPercentage, { color: category.color }]}> 
               {categoryProgress}%
             </Text>
             <Text style={styles.progressText}>
-              {completedCount} de {category.challenges.length} completados
+              {completedTasks} de {totalTasks} tareas completadas
+            </Text>
+            <Text style={styles.progressText}>
+              {completedDays} de {category.challenges.length} días completos
             </Text>
           </View>
-          
           {categoryProgress === 100 && (
             <View style={styles.trophyContainer}>
               <Trophy color="#ffd700" size={32} strokeWidth={2} />
             </View>
           )}
         </View>
-        
         <View style={styles.progressBarContainer}>
           <View style={styles.progressBarBackground}>
             <View 
@@ -148,29 +152,40 @@ export default function CategoryScreen() {
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}>
         <Text style={styles.challengesTitle}>Retos Diarios</Text>
-        
-        {category.challenges.map((challenge, idx) => {
-          const isCompleted = progress[category.id]?.[challenge.id] || false;
-          let isUnlocked = false;
-          if (idx === 0) {
-            isUnlocked = true;
-          } else {
-            const prevChallenge = category.challenges[idx - 1];
-            isUnlocked = progress[category.id]?.[prevChallenge.id] || false;
-          }
-          // Si está bloqueado, pasar una función vacía para evitar error de tipo
-          const handleToggle = isUnlocked ? () => handleChallengeToggle(challenge.id) : () => {};
-          return (
-            <ChallengeItem
-              key={challenge.id}
-              challenge={challenge}
-              isCompleted={isCompleted}
-              onToggle={handleToggle}
-              accentColor={category.color}
-              disabled={!isUnlocked && !isCompleted}
-            />
-          );
-        })}
+        {category.challenges.map((day, dayIdx) => (
+          <View key={day.day} style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginLeft: 24, marginBottom: 8 }}>
+              Día {day.day}
+            </Text>
+            {day.tasks.map((task, taskIdx) => {
+              // Lógica de desbloqueo: todas las tareas del día actual se pueden marcar en cualquier orden,
+              // pero solo si el día anterior está completo (o es el primer día)
+              let isUnlocked = false;
+              if (dayIdx === 0) {
+                isUnlocked = true;
+              } else {
+                const prevDay = category.challenges[dayIdx - 1];
+                const prevDayCompleted = prevDay.tasks.every(
+                  t => progress[category.id]?.[prevDay.day]?.[t.id]
+                );
+                isUnlocked = prevDayCompleted;
+              }
+              const isCompleted = progress[category.id]?.[day.day]?.[task.id] || false;
+              const handleToggle = isUnlocked ? () => handleChallengeToggle(day.day, task.id) : () => {};
+              return (
+                <ChallengeItem
+                  key={task.id}
+                  task={task}
+                  isCompleted={isCompleted}
+                  onToggle={handleToggle}
+                  accentColor={category.color}
+                  dayNumber={day.day}
+                  disabled={!isUnlocked && !isCompleted}
+                />
+              );
+            })}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,22 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, Calendar } from 'lucide-react-native';
-import { Challenge } from '@/types/challenges';
+import { Check } from 'lucide-react-native';
+import { DailyTask } from '@/types/challenges';
 
 interface ChallengeItemProps {
-  challenge: Challenge;
+  task: DailyTask;
   isCompleted: boolean;
   onToggle: () => void;
   accentColor: string;
+  dayNumber: number;
+  disabled?: boolean;
 }
 
 export default function ChallengeItem({ 
-  challenge, 
+  task, 
   isCompleted, 
   onToggle,
   accentColor,
+  dayNumber,
   disabled = false
-}: ChallengeItemProps & { disabled?: boolean }) {
+}: ChallengeItemProps) {
   return (
     <TouchableOpacity 
       style={[
@@ -32,28 +35,19 @@ export default function ChallengeItem({
       activeOpacity={0.7}
       disabled={disabled}
     >
-      
       <View style={styles.leftContent}>
-        <View style={[styles.dayBadge, { backgroundColor: accentColor + '15' }]}>
-          <Calendar color={accentColor} size={16} strokeWidth={2} />
-          <Text style={[styles.dayText, { color: accentColor }]}>
-            Día {challenge.day}
-          </Text>
+        <View style={[styles.dayBadge, { backgroundColor: accentColor + '15' }]}> 
+          <Text style={[styles.dayText, { color: accentColor }]}>Día {dayNumber}</Text>
         </View>
-        
         <View style={styles.textContent}>
           <Text style={[
             styles.title,
             isCompleted && { color: accentColor }
           ]}>
-            {challenge.title}
+            {task.title}
           </Text>
-          {challenge.description && (
-            <Text style={styles.description}>{challenge.description}</Text>
-          )}
         </View>
       </View>
-      
       <TouchableOpacity 
         style={[
           styles.checkbox,
@@ -62,7 +56,10 @@ export default function ChallengeItem({
             borderColor: accentColor,
           }
         ]}
-        onPress={onToggle}>
+        onPress={disabled ? undefined : onToggle}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
+      >
         {isCompleted && (
           <Check color="white" size={18} strokeWidth={3} />
         )}
@@ -115,12 +112,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#2d3748',
     marginBottom: 4,
-  },
-  description: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#718096',
-    lineHeight: 20,
   },
   checkbox: {
     width: 32,

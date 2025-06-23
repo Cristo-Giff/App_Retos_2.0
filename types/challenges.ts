@@ -1,8 +1,11 @@
-export interface Challenge {
+export interface DailyTask {
   id: number;
   title: string;
-  description?: string;
+}
+
+export interface DailyChallenge {
   day: number;
+  tasks: DailyTask[];
 }
 
 export interface Category {
@@ -11,11 +14,13 @@ export interface Category {
   icon: string;
   color: string;
   gradientColors: [string, string];
-  challenges: Challenge[];
+  challenges: DailyChallenge[];
 }
 
 export interface Progress {
   [categoryId: string]: {
-    [challengeId: number]: boolean;
+    [day: number]: {
+      [taskId: number]: boolean;
+    };
   };
 }
