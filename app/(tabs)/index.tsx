@@ -6,21 +6,49 @@ import {
   ScrollView, 
   SafeAreaView,
   RefreshControl,
-  Image
+  Image,
+  TouchableOpacity
 } from 'react-native';
 import { router } from 'expo-router';
+import { Sparkles, Plus } from 'lucide-react-native';
 import { categories } from '@/data/challenges';
 import { Progress } from '@/types/challenges';
 import { loadProgress, calculateCategoryProgress } from '@/utils/storage';
+import { supabase } from '@/lib/supabase';
 import CategoryCard from '@/components/CategoryCard';
+
+interface AIChallenge {
+  id: string;
+  package_name: string;
+  package_description: string;
+  package_icon: string;
+  package_color: string;
+  generated_challenges: any[];
+}
 
 export default function HomeScreen() {
   const [progress, setProgress] = useState<Progress>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [aiChallenges, setAiChallenges] = useState<AIChallenge[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   const loadData = async () => {
     const savedProgress = await loadProgress();
     setProgress(savedProgress);
+
+    // Load user and AI challenges
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+
+    if (user) {
+      const { data: challenges } = await supabase
+        .from('user_ai_challenges')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      setAiChallenges(challenges || []);
+    }
   };
 
   useEffect(() => {
@@ -35,6 +63,14 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (categoryId: string) => {
     router.push(`/category/${categoryId}`);
+  };
+
+  const handleCreateAIChallenge = () => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    router.push('/create-ai-challenge');
   };
 
   const getTotalProgress = () => {
@@ -76,6 +112,24 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* AI Marketing Banner */}
+        <View style={styles.aiMarketingBanner}>
+          <View style={styles.bannerContent}>
+            <View style={styles.bannerText}>
+              <Text style={styles.bannerTitle}>🎯 ¿Tienes una meta?</Text>
+              <Text style={styles.bannerSubtitle}>
+                Deja que la IA cree un plan personalizado para ti
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.aiButton}
+              onPress={handleCreateAIChallenge}>
+              <Sparkles color="white" size={20} strokeWidth={2} />
+              <Text style={styles.aiButtonText}>Crear con IA</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Overall Progress Card */}
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
@@ -96,6 +150,40 @@ export default function HomeScreen() {
             {getCompletedChallenges()} retos completados
           </Text>
         </View>
+
+        {/* AI Challenges Section */}
+        {aiChallenges.length > 0 && (
+          <View style={styles.categoriesSection}>
+            <Text style={styles.sectionTitle}>Tus Retos Personalizados</Text>
+            
+            <View style={styles.categoriesGrid}>
+              {aiChallenges.map((aiChallenge) => {
+                const categoryProgress = calculateCategoryProgress(
+                  progress, 
+                  `ai-${aiChallenge.id}`, 
+                  aiChallenge.generated_challenges.length
+                );
+                
+                const category = {
+                  id: `ai-${aiChallenge.id}`,
+                  name: aiChallenge.package_name,
+                  icon: aiChallenge.package_icon,
+                  color: aiChallenge.package_color,
+                  challenges: aiChallenge.generated_challenges,
+                };
+                
+                return (
+                  <CategoryCard
+                    key={aiChallenge.id}
+                    category={category}
+                    progress={categoryProgress}
+                    onPress={() => handleCategoryPress(`ai-${aiChallenge.id}`)}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Categories Section */}
         <View style={styles.categoriesSection}>
@@ -176,9 +264,60 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'white',
   },
-  progressCard: {
+  aiMarketingBanner: {
     marginHorizontal: 24,
     marginTop: -16,
+    marginBottom: 16,
+    backgroundColor: 'linear-gradient(135deg, #9c88ff 0%, #4c9aff 100%)',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bannerText: {
+    flex: 1,
+    marginRight: 16,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: 'white',
+    opacity: 0.9,
+  },
+  aiButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: 'white',
+  },
+  progressCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
     padding: 24,
     backgroundColor: 'white',
     borderRadius: 20,

@@ -4,6 +4,7 @@ import {
   Dumbbell, 
   Brain, 
   Target,
+  Sparkles,
 } from 'lucide-react-native';
 import { Category } from '@/types/challenges';
 
@@ -17,28 +18,41 @@ const iconMap = {
   dumbbell: Dumbbell,
   brain: Brain,
   target: Target,
+  sparkles: Sparkles,
 };
 
 const categoryImages = {
   fitness: 'https://images.pexels.com/photos/416778/pexels-photo-416778.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
   'mental-health': 'https://images.pexels.com/photos/3760067/pexels-photo-3760067.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
   productivity: 'https://images.pexels.com/photos/590016/pexels-photo-590016.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
+  ai: 'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
 };
 
 export default function CategoryCard({ category, progress, onPress }: CategoryCardProps) {
-  const IconComponent = iconMap[category.icon as keyof typeof iconMap];
+  const IconComponent = iconMap[category.icon as keyof typeof iconMap] || Sparkles;
+  const isAICategory = category.id.startsWith('ai-');
+  
+  // Use AI image for AI-generated categories, otherwise use category-specific image
+  const imageKey = isAICategory ? 'ai' : (category.id as keyof typeof categoryImages);
+  const imageUrl = categoryImages[imageKey] || categoryImages.ai;
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
       <View style={[styles.card, { backgroundColor: category.color + '15' }]}>
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: categoryImages[category.id as keyof typeof categoryImages] }}
+            source={{ uri: imageUrl }}
             style={styles.categoryImage}
           />
           <View style={[styles.iconOverlay, { backgroundColor: category.color }]}>
             <IconComponent color="white" size={24} strokeWidth={2.5} />
           </View>
+          {isAICategory && (
+            <View style={styles.aiBadge}>
+              <Sparkles color="#9c88ff" size={16} strokeWidth={2} />
+              <Text style={styles.aiBadgeText}>IA</Text>
+            </View>
+          )}
         </View>
         
         <View style={styles.content}>
@@ -50,7 +64,7 @@ export default function CategoryCard({ category, progress, onPress }: CategoryCa
                 {progress}% completado
               </Text>
               <Text style={styles.challengeCount}>
-                30 retos disponibles
+                {category.challenges?.length || 30} retos disponibles
               </Text>
             </View>
             
@@ -115,6 +129,31 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.2,
     shadowRadius: 2,
+  },
+  aiBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  aiBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: '#9c88ff',
   },
   content: {
     padding: 20,

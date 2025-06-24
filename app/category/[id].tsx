@@ -10,7 +10,7 @@ import {
   Image
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Trophy, Share } from 'lucide-react-native';
 import { categories } from '@/data/challenges';
 import { Progress } from '@/types/challenges';
 import { 
@@ -19,15 +19,50 @@ import {
   resetCategoryProgress,
   calculateCategoryProgress 
 } from '@/utils/storage';
+import { supabase } from '@/lib/supabase';
+import * as Sharing from 'expo-sharing';
 import ChallengeItem from '@/components/ChallengeItem';
+
+interface AIChallenge {
+  id: string;
+  package_name: string;
+  package_description: string;
+  package_icon: string;
+  package_color: string;
+  generated_challenges: any[];
+  goal_prompt: string;
+}
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [progress, setProgress] = useState<Progress>({});
+  const [aiChallenge, setAiChallenge] = useState<AIChallenge | null>(null);
   
-  const category = categories.find(cat => cat.id === id);
+  const isAIChallenge = id?.startsWith('ai-');
+  const actualId = isAIChallenge ? id?.replace('ai-', '') : id;
   
-  if (!category) {
+  const category = !isAIChallenge ? categories.find(cat => cat.id === id) : null;
+  
+  const loadData = async () => {
+    const savedProgress = await loadProgress();
+    setProgress(savedProgress);
+
+    if (isAIChallenge && actualId) {
+      const { data: challenge } = await supabase
+        .from('user_ai_challenges')
+        .select('*')
+        .eq('id', actualId)
+        .single();
+
+      setAiChallenge(challenge);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  if (!category && !aiChallenge) {
     return (
       <SafeAreaView style={styles.container}>
         <Text>Categoría no encontrada</Text>
@@ -35,17 +70,16 @@ export default function CategoryScreen() {
     );
   }
 
-  const loadData = async () => {
-    const savedProgress = await loadProgress();
-    setProgress(savedProgress);
+  const currentCategory = category || {
+    id: id!,
+    name: aiChallenge?.package_name || 'Reto IA',
+    icon: aiChallenge?.package_icon || 'sparkles',
+    color: aiChallenge?.package_color || '#9c88ff',
+    challenges: aiChallenge?.generated_challenges || [],
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const handleChallengeToggle = async (challengeId: number) => {
-    const newProgress = await toggleChallengeCompletion(category.id, challengeId);
+    const newProgress = await toggleChallengeCompletion(currentCategory.id, challengeId);
     setProgress(newProgress);
   };
 
@@ -62,7 +96,7 @@ export default function CategoryScreen() {
           text: 'Reiniciar',
           style: 'destructive',
           onPress: async () => {
-            const newProgress = await resetCategoryProgress(category.id);
+            const newProgress = await resetCategoryProgress(currentCategory.id);
             setProgress(newProgress);
           },
         },
@@ -70,18 +104,39 @@ export default function CategoryScreen() {
     );
   };
 
+  const handleShare = async () => {
+    if (!isAIChallenge || !aiChallenge) return;
+
+    const shareContent = `🎯 ¡Creé un reto personalizado con IA!
+
+Meta: ${aiChallenge.goal_prompt}
+Plan: ${aiChallenge.package_name}
+
+30 días para transformar mi vida. ¿Te unes al desafío?
+
+#Retos30Dias #IA #CrecimientoPersonal`;
+
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(shareContent);
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
   const categoryProgress = calculateCategoryProgress(
     progress, 
-    category.id, 
-    category.challenges.length
+    currentCategory.id, 
+    currentCategory.challenges.length
   );
 
-  const completedCount = Object.values(progress[category.id] || {}).filter(Boolean).length;
+  const completedCount = Object.values(progress[currentCategory.id] || {}).filter(Boolean).length;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: category.color }]}>
+      <View style={[styles.header, { backgroundColor: currentCategory.color }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity 
             style={styles.backButton} 
@@ -89,17 +144,29 @@ export default function CategoryScreen() {
             <ArrowLeft color="white" size={24} strokeWidth={2} />
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.resetButton} 
-            onPress={handleReset}>
-            <RotateCcw color="white" size={20} strokeWidth={2} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {isAIChallenge && (
+              <TouchableOpacity 
+                style={styles.shareButton} 
+                onPress={handleShare}>
+                <Share color="white" size={20} strokeWidth={2} />
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.resetButton} 
+              onPress={handleReset}>
+              <RotateCcw color="white" size={20} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
         </View>
         
         <View style={styles.headerContent}>
           <View style={styles.titleSection}>
-            <Text style={styles.categoryTitle}>{category.name}</Text>
-            <Text style={styles.categorySubtitle}>Reto de 30 días</Text>
+            <Text style={styles.categoryTitle}>{currentCategory.name}</Text>
+            <Text style={styles.categorySubtitle}>
+              {isAIChallenge ? 'Reto personalizado con IA' : 'Reto de 30 días'}
+            </Text>
           </View>
           
           <Image 
@@ -113,11 +180,11 @@ export default function CategoryScreen() {
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <View style={styles.progressStats}>
-            <Text style={[styles.progressPercentage, { color: category.color }]}>
+            <Text style={[styles.progressPercentage, { color: currentCategory.color }]}>
               {categoryProgress}%
             </Text>
             <Text style={styles.progressText}>
-              {completedCount} de {category.challenges.length} completados
+              {completedCount} de {currentCategory.challenges.length} completados
             </Text>
           </View>
           
@@ -135,7 +202,7 @@ export default function CategoryScreen() {
                 styles.progressBarFill, 
                 { 
                   width: `${categoryProgress}%`,
-                  backgroundColor: category.color
+                  backgroundColor: currentCategory.color
                 }
               ]} 
             />
@@ -143,14 +210,22 @@ export default function CategoryScreen() {
         </View>
       </View>
 
+      {/* AI Goal Display */}
+      {isAIChallenge && aiChallenge && (
+        <View style={styles.goalCard}>
+          <Text style={styles.goalTitle}>Tu Meta Personal</Text>
+          <Text style={styles.goalText}>"{aiChallenge.goal_prompt}"</Text>
+        </View>
+      )}
+
       {/* Challenges List */}
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}>
         <Text style={styles.challengesTitle}>Retos Diarios</Text>
         
-        {category.challenges.map((challenge) => {
-          const isCompleted = progress[category.id]?.[challenge.id] || false;
+        {currentCategory.challenges.map((challenge) => {
+          const isCompleted = progress[currentCategory.id]?.[challenge.id] || false;
           
           return (
             <ChallengeItem
@@ -158,7 +233,7 @@ export default function CategoryScreen() {
               challenge={challenge}
               isCompleted={isCompleted}
               onToggle={() => handleChallengeToggle(challenge.id)}
-              accentColor={category.color}
+              accentColor={currentCategory.color}
             />
           );
         })}
@@ -186,6 +261,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  shareButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -278,6 +365,36 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  goalCard: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#9c88ff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  goalTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#2d3748',
+    marginBottom: 8,
+  },
+  goalText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#718096',
+    fontStyle: 'italic',
+    lineHeight: 20,
   },
   scrollContainer: {
     flex: 1,
